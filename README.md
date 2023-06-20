@@ -58,8 +58,12 @@ if id/token was correct
         "visibleMapHeight": 1001,  // always odd
 
         // depends on choosen role
-        "shootRange": 5, // how far you damage can go
-        "shootRadius" 1 // how wide your damage can go (in radian)
+        "shootRange": 5, // how far you damage can go (in cells)
+        "shootRadius" 1, // how wide your damage can go (in radian)
+        "moveSpeed": 5, // cell per tick
+        "shootSpeed": 10, // cell per tick
+        "hitboxWidth": 5,  // always odd
+        "hittboxHeight: 5,  // always odd
     }
 }
 ```
