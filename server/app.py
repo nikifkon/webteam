@@ -153,7 +153,6 @@ async def tick():
         await asyncio.sleep(TICK_RATE)
 
 loop = asyncio.get_event_loop()
-
 loop.create_task(tick())
 
 

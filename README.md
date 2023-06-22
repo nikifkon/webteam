@@ -1,3 +1,14 @@
+## Usage
+
+start local server: `localhost:8081`
+
+```
+cd server
+pip install -r requirements.txt
+python app.py
+```
+
+
 ## Api
 
 ### `/api/register` (http)
