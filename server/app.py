@@ -1,9 +1,18 @@
 import asyncio
 import math
 import json
+import random
+import base64
+import os
 
+import aiohttp_cors
+import aiohttp
+from aiohttp import web
 import websockets
 
+
+HOST = os.getenv('HOST', '0.0.0.0')
+PORT = int(os.getenv('PORT', 8081))
 
 TICK_RATE = 1/30
 
@@ -31,13 +40,22 @@ class Player:
 
 class RegService:
     def __init__(self):
-        pass
+        self.max_id = 0
+        self.db = {}
+
+    def _get_next_id(self):
+        self.max_id += 1
+        return self.max_id
 
     def regPlayer(self, player):
-        pass
+        new_id = str(self._get_next_id())
+        new_token = base64.b64encode(random.randbytes(20)).decode()
+        self.db[(new_id, new_token)] = player
+        print(self.db)
+        return dict(id=new_id, token=new_token)
     
     def loginPlayer(self, id: int, token: str) -> Player:
-        return Player("test", MELEE_ROLE)
+        return self.db[(id, token)]
 
 def norm(l, vecX, vecY):
     lo = math.sqrt(vecX * vecX + vecY * vecY)
@@ -47,8 +65,8 @@ def norm(l, vecX, vecY):
 
 class Map:
     def __init__(self, filename):
-        self.visible_width: 1001
-        self.visible_height: 1001
+        self.visible_width = 1001
+        self.visible_height = 1001
         self.speed = 5  # cell per second
         self.shoot_speed = 10
 
@@ -69,31 +87,32 @@ class Map:
         pass
     
     def __str__(self):
-        pass
+        return "\n".join(self._map)
 
 
 class Game:
     def __init__(self):
         self.playersQueues = {}
-        self.map = Map()
+        self.map = Map("free100x30.txt")
     
     def joinPlayer(self, player) -> dict:
         self.playersQueues[player] = {
             "move": [],
             "shoot": []
         }
-        self.map.spawnPLayer(player)
+        self.map.spawnPlayer(player)
         data = {}
         data["mapWidth"] = self.map.width
         data["mapHeight"] = self.map.height
         data["visibleMapWidth"] = self.map.visible_width
         data["visibleMapHeight"] = self.map.visible_height
-        data["shootRange"] = self.player.shoot_range
-        data["shootRadius"] = self.player.shoot_radius
-        data["moveSpeed"] = self.player.move_speed
-        data["shootSpeed"] = self.player.shoot_speed
-        data["hitboxWidth"] = self.player.hitbox_width
-        data["hitboxHeight"] = self.player.hitbox_height
+        data["shootRange"] = player.shoot_range
+        data["shootRadius"] = player.shoot_radius
+        data["moveSpeed"] = player.move_speed
+        data["shootSpeed"] = player.shoot_speed
+        data["hitboxWidth"] = player.hitbox_width
+        data["hitboxHeight"] = player.hitbox_height
+        data["map"] = str(self.map)
         return data
         
     
@@ -141,54 +160,91 @@ loop.create_task(tick())
 async def handler(websocket, path):
     try:
         async for msg in websocket:
-            data = json.loads(msg)
-            command = data.get("command")
-            if command == "join":
-                player = REG_SERVICE.loginPlayer(*data["data"])
-                if not player:
-                    await websocket.send(json.dumps({
-                        "command": "join",
-                        "status": "fail",
-                        "data": {"detail": "wrong id/token pair"}
-                    }))
-                    return
-                WS2PLAYER[websocket] = player
-                data = GAME.joinPlayer(player)
-                await websocket.send(json.dumps({
-                    "command": "join",
-                    "status": "ok",
-                    "data": data
-                }))
-            elif command == "move":
-                player = WS2PLAYER.get(websocket)
-                if not player:
-                    await websocket.send(json.dumps({
-                        "command": "move",
-                        "status": "fail",
-                        "data": {
-                            "detail": "unauthorized."
-                        }
-                    }))
-                GAME.registerMove(player, **data["data"])
-            elif command == "shoot":
-                player = WS2PLAYER.get(websocket)
-                if not player:
-                    await websocket.send(json.dumps({
-                        "command": "shoot",
-                        "status": "fail",
-                        "data": {
-                            "detail": "unauthorized."
-                        }
-                    }))
-                GAME.register(player, **data["data"])
+            await handle_message(msg, websocket)
     except websockets.ConnectionClosedError:
         pass
     finally:
         WS2PLAYER.pop(websocket, None)
-        
+
+async def handle_message(msg, websocket):
+    data = json.loads(msg)
+    print(data)
+    command = data.get("command")
+    if command == "join":
+        player = REG_SERVICE.loginPlayer(**data["data"])
+        if not player:
+            await websocket.send_str(json.dumps({
+                "command": "join",
+                "status": "fail",
+                "data": {"detail": "wrong id/token pair"}
+            }))
+            return
+        WS2PLAYER[websocket] = player
+        data = GAME.joinPlayer(player)
+        await websocket.send_str(json.dumps({
+            "command": "join",
+            "status": "ok",
+            "data": data
+        }))
+    elif command == "move":
+        player = WS2PLAYER.get(websocket)
+        if not player:
+            await websocket.send_str(json.dumps({
+                "command": "move",
+                "status": "fail",
+                "data": {
+                    "detail": "unauthorized."
+                }
+            }))
+        GAME.registerMove(player, **data["data"])
+    elif command == "shoot":
+        player = WS2PLAYER.get(websocket)
+        if not player:
+            await websocket.send_str(json.dumps({
+                "command": "shoot",
+                "status": "fail",
+                "data": {
+                    "detail": "unauthorized."
+                }
+            }))
+        GAME.register(player, **data["data"])
 
 
-if __name__ == "__main__":
-    start_server = websockets.serve(handler, "", 8001)
-    loop.run_until_complete(start_server)
-    loop.run_forever()
+async def testhandle(request):
+    data = await request.json()
+    ret = REG_SERVICE.regPlayer(Player(data["name"], RANGE_ROLE if data["role"] == "range" else MELEE_ROLE))
+    return web.json_response(ret)
+
+
+async def websocket_handler(request):
+    print('Websocket connection starting')
+    ws = aiohttp.web.WebSocketResponse()
+    await ws.prepare(request)
+    print('Websocket connection ready')
+
+    async for msg in ws:
+        if msg.type == aiohttp.WSMsgType.TEXT:
+            await handle_message(msg.data, ws)
+
+    print('Websocket connection closed')
+    return ws
+
+
+def main():
+    app = aiohttp.web.Application()
+    app.router.add_route('POST', '/api/register', testhandle)
+    app.router.add_route('GET', '/api/game', websocket_handler)
+    cors = aiohttp_cors.setup(app, defaults={
+        "*": aiohttp_cors.ResourceOptions(
+                allow_credentials=True,
+                expose_headers="*",
+                allow_headers="*"
+            )
+    })
+    for route in list(app.router.routes()):
+        cors.add(route)
+    aiohttp.web.run_app(app, host=HOST, port=PORT)
+
+
+if __name__ == '__main__':
+    main()
