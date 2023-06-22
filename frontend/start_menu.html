@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>start_menu</title>
+    <link rel="stylesheet" type="text/css" href="start_menu.css">
+</head>
+<body>
+<div class="main-container">
+    <form action="/api/register" method="POST">
+        <div class="form-group">
+            <label for="name">Введи имя:</label>
+            <input type="text" id="name" class="form-item" name="name" required>
+
+            <label for="role">Выбери роль:</label>
+            <select id="role" class="form-item" name="role" required>
+                <option value="melee">melee</option>
+                <option value="range">range</option>
+            </select>
+
+            <button class="form-item btn-submit" type="submit">Зарегистрироваться</button>
+        </div>
+
+    </form>
+</div>
+</body>
+</html>
