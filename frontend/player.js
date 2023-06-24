@@ -3,8 +3,7 @@ import Vector from "./vector.js";
 export class Player {
     constructor(init_pos) {
         this.pos = init_pos || new Vector(10, 10);
-        Player.img = new Image();
-        Player.img.src = "mile_sprite.png";
+        Player.img = document.getElementById("melee_sprite")
     }
 
     static img;

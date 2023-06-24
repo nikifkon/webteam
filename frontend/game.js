@@ -1,24 +1,35 @@
 import Vector from './vector.js';
 
 export class Game {
-    constructor(field, players) {
+    constructor(field, players, context) {
         this.field = field;
         this.players = players;
-        this.center = new Vector(500, 300);
+        this.context = context;
+        this.damage_areas = []
+        this.center = new Vector(this.field.getPixelWidth() / 2, this.field.getPixelHeight() / 2);
     }
 
     render(ctx) {
-        const leftCorner = this.getLeftCorner(ctx, this.center);
+        const leftCorner = this.getLeftCorner(ctx);
+        console.debug(this.center, leftCorner);
+        
+        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        this.field.render(ctx, leftCorner);  // slow! TODO: rerender only chunks
+        console.debug(this.players);
+        
         ctx.save();
         ctx.translate(leftCorner.x, leftCorner.y);
-        this.field.render(ctx);  // slow! TODO: rerender only chunks
         for (let player of this.players) {
             player.render(ctx);
+        }
+
+        for (let area of this.damage_areas) {
+            area.render(ctx);
         }
         ctx.restore();
     }
 
-    getLeftCorner(ctx, center) {
-        return (new Vector(ctx.canvas.width, ctx.canvas.height)).mul(0.5).add(center.neg());
+    getLeftCorner(ctx) {
+        return (new Vector(this.context.canvas.width, this.context.canvas.height)).mul(0.5).add(this.center.neg());
     }
 }

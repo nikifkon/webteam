@@ -36,7 +36,7 @@ Response
 }
 ```
 
-## `/api/game/<room>` (websockets)
+## `/api/game` (websockets)
 
 This is main api endpoint. Here you can interact with other players and subscribe for updates
 
@@ -71,10 +71,11 @@ if id/token was correct
         // depends on choosen role
         "shootRange": 5, // how far you damage can go (in cells)
         "shootRadius" 1, // how wide your damage can go (in radian)
-        "moveSpeed": 5, // cell per tick
-        "shootSpeed": 10, // cell per tick
+        "moveSpeed": 5, // cell per sec
+        "shootSpeed": 10, // cell per sec
         "hitboxWidth": 5,  // always odd
         "hittboxHeight: 5,  // always odd
+        "HP": 10,
     }
 }
 ```
@@ -99,8 +100,26 @@ Every tick you got messages like this:
 {
     "posX": 228,
     "posY": 42,
-    "visibleMap": "MAP IN FORMAT DESCRIBED BELLOW",
-    "shootCD": "HOW MUCH TIME I HAVE TO WAIT BEFORE NEXT SHOOT"
+    "HP": 10,
+    "shootCD": "HOW MUCH TIME I HAVE TO WAIT BEFORE NEXT SHOOT",
+    "visibleEnemeis": [
+        {
+            "role": "melee"|"range",
+            "posX": 227,
+            "posY": 42,
+            "HP": 5
+        },
+        {
+            ...
+        }
+    ],
+    "visibleDamage": [
+        {
+            "type": "melee"|"range",
+            "posX": "227",
+            "posY": 42,
+        }
+    ]
 }
 ```
 
@@ -108,42 +127,12 @@ visible map - is part of whole map visible by player. Its matrix of letters cent
 
 each letter means something:
 
-"F" - free cell
-"U" - you cell
-"E" - enemy cell
-"D" - demage cell
+- "F" - free cell
+- "W" - wall cell
+- "U" - you cell
+- "E" - enemy cell
+- "D" - damage cell
 
-For example:
-
-if whole map is 7x7
-
-```
-FFFFFFF
-EFFFFFF
-FFFFFFF
-FFFFFFF
-FFFFUFF
-FFFFFFF
-FFFFFFF
-```
-
-your pos: x=4,y=4
-
-enemy pos: x=0,y=1
-
-and visibility: width=5,height=5
-
-you will get following map
-
-```
-FFFFF
-FFFFF
-FFUFF
-FFFFF
-FFFFF
-```
-
-so you can not see the enemy
 
 ### Moving
 
@@ -179,4 +168,3 @@ Request
     }
 }
 ```
-

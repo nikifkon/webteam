@@ -4,25 +4,51 @@ export class Field {
         for (let line of pattern.split('\n')) {
             this.cells.push([]);
             for (let cell_type of line) {
-                let cell = cell_type == 'F' ? new Free() : new Wall();
+                let cell = new None();
+                if (cell_type === "F") {
+                    cell = new Free();
+                } else if (cell_type === "W") {
+                    cell = new Wall();
+                } 
                 this.cells[this.cells.length - 1].push(cell);
             }
         }
         this.width = pattern.split('\n')[0].length - 1;
         this.height = pattern.split('\n').length - 1;
         this.cell_size = cell_size;
+        this._field_image_data = null;
+    }
+
+    getPixelWidth() {
+        return this.width * this.cell_size;
+    }
+
+    getPixelHeight() {
+        return this.height * this.cell_size;
+    }
+
+    getField(ctx) {
+        if (this._field_image_data === null) {
+            ctx.beginPath();
+        
+            for (let y = 0; y < this.height; y++) {
+                for (let x = 0; x < this.width; x++) {
+                    ctx.save();
+                    ctx.translate(x * this.cell_size, y * this.cell_size);
+                    this.cells[y][x].render(ctx);
+                    ctx.restore();
+                }
+            }
+            console.debug(ctx.canvas.width, ctx.canvas.height);
+            
+            this._field_image_data = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height);
+        }
+        return this._field_image_data;
     }
 
     // Render
-    render(ctx) {
-        for (let y = 0; y < this.height; y++) {
-            for (let x = 0; x < this.width; x++) {
-                ctx.save();
-                ctx.translate(x * this.cell_size, y * this.cell_size);
-                this.cells[y][x].render(ctx);
-                ctx.restore();
-            }
-        }
+    render(ctx, leftCorner) {
+        ctx.putImageData(this.getField(ctx), leftCorner.x, leftCorner.y)
     }
 }
 
@@ -35,8 +61,7 @@ export class Cell {
 export class Free extends Cell {
     constructor() {
         super();
-        Free.img = new Image();
-        Free.img.src = "free_sprite2x2.png";
+        Free.img = document.getElementById("free_sprite")
     }
 
     static img;
@@ -54,4 +79,34 @@ export class Wall extends Cell {
     }
 
     static img;
+}
+
+export class None extends Cell {
+    constructor() {
+        super();
+        None.img = document.getElementById("none_sprite")
+    }
+
+    static img;
+
+    render(ctx) {
+        ctx.drawImage(None.img, 0, 0);
+    }
+}
+
+export class Bullet extends Cell {
+    constructor(pos) {
+        super();
+        this.pos = pos;
+        Bullet.img = document.getElementById("bullet_sprite")
+    }
+
+    static img;
+
+    render(ctx) {
+        ctx.save();
+        ctx.translate(this.pos.x, this.pos.y);
+        ctx.drawImage(Bullet.img, 0, 0);
+        ctx.restore();
+    }
 }

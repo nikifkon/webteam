@@ -12,4 +12,6 @@ html, body {
 canvas {
     display: block;
     overflow: hidden;
+    background-image: url('none_sprite.png');
+    background-repeat: repeat;
 }
