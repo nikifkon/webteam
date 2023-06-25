@@ -31,10 +31,10 @@ class Player:
     def __init__(self, name, role):
         self.name = name
         self.role = role
-        self.hitbox_width = 20
-        self.hitbox_height = 20
-        self.move_speed = 100
-        self.shoot_speed = 200
+        self.hitbox_width = 2
+        self.hitbox_height = 3
+        self.move_speed = 10
+        self.shoot_speed = 20
         self.hp = 10
         if role == MELEE_ROLE:
             self.charge_cd = 1
@@ -54,6 +54,24 @@ class Player:
     def is_col(self, pl_pos: Vector, pos: Vector) -> bool:
         diff = pl_pos - pos
         return all(abs(c) < thr for c, thr in zip(diff.values, [self.hitbox_width, self.hitbox_height]))
+
+    def get_kontur(self, pl_pos: Vector) -> list[Vector]:
+        hw, hh = self.hitbox_width / 2, self.hitbox_height / 2
+        hw_v, hh_v = Vector(hw, 0), Vector(0, hh)
+        return [
+            pl_pos + hw_v + hh_v,
+            pl_pos + hw_v - hh_v,
+            pl_pos - hw_v + hh_v,
+            pl_pos - hw_v - hh_v
+        ]
+
+    def check_wall_in(self, pl_pos: Vector, map: list[list[str]]):
+        for pos in self.get_kontur(pl_pos):
+            y = max(0, min(len(map) - 1, int(pos.values[1])))
+            x = max(0, min(len(map[0]) - 1, int(pos.values[0])))
+            if map[y][x] == 'W':
+                return True
+        return False
 
 class DamageArea:
     def __init__(self, owner: Player, ttl: float, created_at: float):
@@ -98,8 +116,8 @@ class RegService:
 
 class Map:
     def __init__(self, filename):
-        self.visible_width = 1000
-        self.visible_height = 1000
+        self.visible_width = 50
+        self.visible_height = 50
         self.player2pos: dict[Player, Vector] = {}  # always discrete
         self.damageAreas2pos: dict[tuple[DamageArea, Vector]] = {}
 
@@ -107,6 +125,7 @@ class Map:
             self._map = list(map(lambda line: list(line.strip()), f.readlines()))
             self.width = len(self._map[0])
             self.height = len(self._map)
+            print(self._map)
     
     def spawnPlayer(self, player: Player):
         x, y = random.randint(0, self.width - 1), random.randint(0, self.height - 1)
@@ -114,10 +133,23 @@ class Map:
 
 
     def move(self, player: Player, vec: Vector, dt: float, apply_charge: bool):
-        vec = dt * player.move_speed * vec.normalize()
+        print(self.player2pos[player])
+        direction = vec.normalize()
+        l = dt * player.move_speed
         if apply_charge:
-            vec *= player.charge_mul
-        self.player2pos[player] += vec
+            l *= player.charge_mul
+        for _ in range(100):
+            self.player2pos[player] += 0.01 * l * direction
+            
+            tries = 0
+            while tries < 100 and player.check_wall_in(self.player2pos[player], self._map):
+                print('go back')
+                self.player2pos[player] -= 0.01 * l * direction
+                tries += 1
+            else:
+                if tries > 0:
+                    break
+
 
     def shoot(self, area: DamageArea):
         self.damageAreas2pos[area] = self.player2pos[area.owner]
@@ -126,8 +158,11 @@ class Map:
         for area in list(self.damageAreas2pos.keys()):
             vec = dt * area.owner.shoot_speed * area.direction.normalize()
             self.damageAreas2pos[area] += vec
+            pos = self.damageAreas2pos[area]
             if pl := self.find_col_player(area):
                 pl.hp = max(0, pl.hp - area.owner.shoot_damage)
+                self.damageAreas2pos.pop(area)
+            if self._map[int(pos.values[1])][int(pos.values[0])] == 'W':
                 self.damageAreas2pos.pop(area)
             if area.created_at + area.ttl < time:
                 self.damageAreas2pos.pop(area)
@@ -160,7 +195,7 @@ class Game:
         self.damageAreaQueue = []
         self.player2lastshoot: dict[Player, float] = {}
         self.player2lastcharge: dict[Player, float] = {}
-        self.map = Map("server/free100x30.txt")
+        self.map = Map("server/idoknow100x100.txt")
     
     def joinPlayer(self, player: Player) -> dict:
         self.playersQueues[player] = {
@@ -275,7 +310,6 @@ async def tick(app):
 async def handle_message(msg, websocket, app):
     try:
         data = json.loads(msg)
-        print(data)
         command = data.get("command")
         if command == "join":
             player = app['REG_SERVICE'].loginPlayer(**data["data"])
@@ -316,7 +350,7 @@ async def handle_message(msg, websocket, app):
                 }))
             app['GAME'].registerShoot(player, data["data"])
     except Exception as exc:
-        print(exc)
+        raise
     finally:
         pass
 
@@ -369,18 +403,8 @@ async def get_app():
         cors.add(route)
     return app
 
-async def run(loop):
-    app = get_app()
-
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, HOST, PORT)
-    await site.start()
-    while True:
-        await asyncio.sleep(5)
-
+def run():
+    web.run_app(get_app(), host=HOST, port=PORT)
 
 if __name__ == '__main__':
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(run(loop))
-    loop.close()
+    run()

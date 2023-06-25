@@ -5,7 +5,7 @@ import Vector from './vector.js';
 import { MoveCommand, ShootCommand } from './commands.js';
 
 
-const WS_ENDPOINT = 'ws://158.160.48.156/api/game'
+const WS_ENDPOINT = 'ws://localhost:8081/api/game'
 
 const playerCommand = [];
 const me = new Player();
@@ -158,19 +158,22 @@ async function entrypoint() {
         let data = JSON.parse(ev.data);
         console.debug(data);
         if (data["command"] === "join") {
+            console.log(data);
             // TODO: handle wrong creds
             const map = new Field(data["data"]['map'], CELL_SIZE_IN_PIXELS);
             GAME = new Game(map, [me], cxt);
+            me.width = data["data"]["hitboxWidth"] * CELL_SIZE_IN_PIXELS
+            me.height = data["data"]["hitboxHeight"] * CELL_SIZE_IN_PIXELS
             console.log(GAME);
         } else if (data["command"] === "update") {
-            const new_center = new Vector(data["data"]["posX"], data["data"]["posY"]);
+            const new_center = (new Vector(data["data"]["posX"], data["data"]["posY"])).mul(CELL_SIZE_IN_PIXELS);
             GAME.center = new_center;
             me.pos = new_center;
             
             // TODO ????
             const enemies = [];
             data["data"]["visibleEnemeis"].forEach(enemy => {
-                enemies.push(new Player(new Vector(enemy.posX, enemy.posY)))
+                enemies.push(new Player((new Vector(enemy.posX, enemy.posY).mul(CELL_SIZE_IN_PIXELS))))
             })
 
             GAME.players = [
@@ -181,7 +184,7 @@ async function entrypoint() {
             const areas = [];
             data.data.visibleDamage.forEach(area => {
                 if (area.type === "range") {
-                    areas.push(new Bullet(new Vector(area.posX, area.posY)));
+                    areas.push(new Bullet((new Vector(area.posX, area.posY)).mul(CELL_SIZE_IN_PIXELS)));
                 }
             });
 

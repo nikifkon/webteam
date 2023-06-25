@@ -1,14 +1,19 @@
 http://158.160.48.156/frontend/start_menu.html
 
+python3 -m gunicorn server.app:get_app --bind localhost:8081 --worker-class aiohttp.GunicornWebWorker
+
 ## Usage
 
 start local server: `localhost:8081`
 
 ```
-cd server
 pip install -r requirements.txt
-python app.py
+python -m server.app
 ```
+
+open
+
+`frontend/start_menu.js`
 
 
 ## Api

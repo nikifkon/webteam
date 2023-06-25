@@ -29,8 +29,14 @@ export class Field {
 
     getField(ctx) {
         if (this._field_image_data === null) {
+            const canvas = ctx.canvas;
+            console.log(canvas, this);
+            const init_width = canvas.width;
+            const init_height = canvas.height;
+            canvas.width = this.getPixelWidth() * 10;
+            canvas.height = this.getPixelHeight() * 10;
             ctx.beginPath();
-        
+
             for (let y = 0; y < this.height; y++) {
                 for (let x = 0; x < this.width; x++) {
                     ctx.save();
@@ -39,9 +45,10 @@ export class Field {
                     ctx.restore();
                 }
             }
-            console.debug(ctx.canvas.width, ctx.canvas.height);
             
             this._field_image_data = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height);
+            canvas.width = init_width;
+            canvas.height = init_height;
         }
         return this._field_image_data;
     }
@@ -75,10 +82,14 @@ export class Wall extends Cell {
     constructor() {
         super();
         Wall.img = new Image();
-        Wall.img.src = "free_sprite.png";
+        Wall.img.src = "wall_sprite.png";
     }
 
     static img;
+
+    render(ctx) {
+        ctx.drawImage(Wall.img, 0, 0);
+    }
 }
 
 export class None extends Cell {
