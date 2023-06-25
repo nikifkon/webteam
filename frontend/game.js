@@ -13,6 +13,7 @@ export class Game {
         const leftCorner = this.getLeftCorner(ctx);
         console.debug(this.center, leftCorner);
         
+        console.log(0, 0, ctx.canvas.width, ctx.canvas.height);
         ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
         this.field.render(ctx, leftCorner);  // slow! TODO: rerender only chunks
         console.debug(this.players);

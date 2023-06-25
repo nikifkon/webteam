@@ -143,6 +143,7 @@ async function entrypoint() {
 
     socket.addEventListener('close', ev => {
         console.debug(`connection closed cauz ${ev.reason}`);
+        window.location.href = '/frontend/start_menu.html'
     })
 
     socket.addEventListener('error', ev => {
@@ -162,18 +163,20 @@ async function entrypoint() {
             // TODO: handle wrong creds
             const map = new Field(data["data"]['map'], CELL_SIZE_IN_PIXELS);
             GAME = new Game(map, [me], cxt);
-            me.width = data["data"]["hitboxWidth"] * CELL_SIZE_IN_PIXELS
-            me.height = data["data"]["hitboxHeight"] * CELL_SIZE_IN_PIXELS
+            cxt['maxHP'] = data["data"]["HP"];
+            cxt['hitboxWidth'] = data["data"]["hitboxWidth"] * CELL_SIZE_IN_PIXELS;
+            cxt['hitboxHeight'] = data["data"]["hitboxHeight"] * CELL_SIZE_IN_PIXELS;
             console.log(GAME);
         } else if (data["command"] === "update") {
             const new_center = (new Vector(data["data"]["posX"], data["data"]["posY"])).mul(CELL_SIZE_IN_PIXELS);
             GAME.center = new_center;
             me.pos = new_center;
-            
+            me.hp = data["data"]["HP"]
+
             // TODO ????
             const enemies = [];
             data["data"]["visibleEnemeis"].forEach(enemy => {
-                enemies.push(new Player((new Vector(enemy.posX, enemy.posY).mul(CELL_SIZE_IN_PIXELS))))
+                enemies.push(new Player((new Vector(enemy.posX, enemy.posY).mul(CELL_SIZE_IN_PIXELS)), enemy.HP))
             })
 
             GAME.players = [

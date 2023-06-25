@@ -1,22 +1,37 @@
 import Vector from "./vector.js";
 
 export class Player {
-    constructor(init_pos, width, height, cell_size) {
+    constructor(init_pos, hp) {
         this.pos = init_pos || new Vector(10, 10);
-        this.width = width;
-        this.height = height;
+        this.hp = hp;
         Player.img = document.getElementById("melee_sprite")
     }
 
     static img;
 
     // Render
-    render(ctx) {
-        console.log(this);
-        ctx.save();
-        ctx.translate(this.pos.x, this.pos.y);
-        ctx.translate(-this.width/2, -this.height/2);
-        ctx.drawImage(Player.img, 0, 0);
-        ctx.restore();
+    render(cxt) {
+        cxt.save();
+        cxt.translate(this.pos.x, this.pos.y);
+        cxt.translate(-cxt['hitboxWidth'] / 2, -cxt['hitboxHeight'] / 2);
+        cxt.drawImage(Player.img, 0, 0);
+
+        const hpBarWidth = cxt['hitboxWidth'];
+        const hpBarHeight = 7;
+
+        console.log(cxt);
+        cxt.translate(0, -hpBarHeight - 5);
+        cxt.beginPath();
+        cxt.rect(0, 0, hpBarWidth, hpBarHeight);
+        cxt.fillStyle = "gray";
+        cxt.fill();
+
+        console.log(hpBarWidth, hpBarWidth * this.hp / cxt.maxHP);
+        cxt.beginPath();
+        cxt.rect(0, 0, hpBarWidth * this.hp / cxt.maxHP, hpBarHeight);
+        cxt.fillStyle = "red";
+        cxt.fill();
+
+        cxt.restore();
     }
 }
