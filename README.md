@@ -180,3 +180,46 @@ Request
     }
 }
 ```
+
+
+### Events
+
+Player joined
+
+Request
+```
+{
+    "command": "new_player",
+    "data": {
+        "name": "SUS",
+    }
+}
+```
+
+
+Player loose
+
+Request
+```
+{
+    "command": "player_loose",
+    "data": {
+        "id": 1,
+        "name": "SUS",
+    }
+}
+```
+
+
+Player win
+
+Request
+```
+{
+    "command": "player_win",
+    "data": {
+        "id": 1,
+        "name": "SUS",
+    }
+}
+```

@@ -29,7 +29,9 @@ RANGE_ROLE = 1
 
 class Player:
     def __init__(self, name, role):
+        self.id = None
         self.name = name
+        self.new = True
         self.role = role
         self.hitbox_width = 2
         self.hitbox_height = 3
@@ -37,14 +39,14 @@ class Player:
         self.shoot_speed = 20
         self.hp = 10
         if role == MELEE_ROLE:
-            self.charge_cd = 1
+            self.charge_cd = 3
             self.charge_mul = 50
             self.shoot_cd = 1.5
             self.shoot_range = 10
             self.shoot_radius = 2
             self.shoot_damage = 4
         else:
-            self.charge_cd = 1
+            self.charge_cd = 3
             self.charge_mul = 50
             self.shoot_cd = 1
             self.shoot_range = 300
@@ -107,6 +109,7 @@ class RegService:
         new_id = str(self._get_next_id())
         new_token = base64.b64encode(random.randbytes(20)).decode()
         self.db[(new_id, new_token)] = player
+        player.id = new_id
         print(self.db)
         return dict(id=new_id, token=new_token)
     
@@ -125,11 +128,13 @@ class Map:
             self._map = list(map(lambda line: list(line.strip()), f.readlines()))
             self.width = len(self._map[0])
             self.height = len(self._map)
-            print(self._map)
     
     def spawnPlayer(self, player: Player):
         x, y = random.randint(0, self.width - 1), random.randint(0, self.height - 1)
         self.player2pos[player] = Vector(x, y)
+
+    def removePlayer(self, player: Player):
+        self.player2pos.pop(player)
 
 
     def move(self, player: Player, vec: Vector, dt: float, apply_charge: bool):
@@ -221,7 +226,12 @@ class Game:
         self.player2lastshoot[player] = -player.shoot_cd
         self.player2lastcharge[player] = -player.charge_cd
         return data
-        
+
+    def removePlayer(self, player: Player):
+        self.player2lastshoot.pop(player)
+        self.player2lastcharge.pop(player)
+        self.player2pos.pop(player, None)
+        self.map.removePlayer(player)
     
     def registerMove(self, player: Player, data: dict):
         self.playersQueues[player]["move"].append((Vector(data["vecX"], data["vecY"]), data['charge']))
@@ -264,7 +274,7 @@ class Game:
         return time - self.player2lastshoot[player] > player.shoot_cd
     
     def can_charge(self, player: Player, time: float):
-        return time - self.player2lastshoot[player] > player.charge_cd
+        return time - self.player2lastcharge[player] > player.charge_cd
     
     
     def updateGame(self, dt, time):
@@ -273,9 +283,9 @@ class Game:
             shoot_q = queues['shoot']
             charge_q = queues['charge']
 
-
             if move_q:
                 apply_charge = any(move[1] for move in move_q) and self.can_charge(player, time)
+                if apply_charge: self.player2lastcharge[player] = time
                 self.map.move(player, move_q[0][0], dt, apply_charge)
             if shoot_q and self.can_shoot(player, time):
                 if player.role == MELEE_ROLE:
@@ -288,14 +298,55 @@ class Game:
             shoot_q.clear()
             charge_q.clear()
         self.map.moveDamageAreas(dt, time)
-
+        
 
 
 async def tick(app):
     overall = 0
     while True:
         app['GAME'].updateGame(TICK_RATE, overall)
+        new_players = []
+        players_that_loose = []
+        player_that_might_win = []
+        ws_to_close = []
+        
+        for player in app['WS2PLAYER'].values():
+            if player.new:
+                new_players.append(player)
+                player.new = False
+            elif player.hp <= 0:
+                players_that_loose.append(player)
+            else:
+                player_that_might_win.append(player)
+        has_winner = len(player_that_might_win) == 1 and len(players_that_loose) > 0
+        winner = player_that_might_win[0] if has_winner else None
+
+        common_msgs = [{
+            "command": "player_loose",
+            "data": {
+                "id": player.id,
+                "name": player.name,
+            }
+        } for player in players_that_loose]
+        if has_winner:
+            common_msgs.append({
+                "command": "player_win",
+                "data": {
+                    "id": winner.id,
+                    "name": winner.name,
+                }
+            })
+        common_msgs.extend({
+            "command": "new_player",
+            "data": {
+                "id": player.id,
+                "name": player.name
+            }
+        } for player in new_players)
+
         for ws, player in app['WS2PLAYER'].items():
+            if player in players_that_loose:
+                ws_to_close.append(ws)
             data = app['GAME'].getUpdateForPlayer(player)           
             msg = {
                 "command": "update",
@@ -303,6 +354,11 @@ async def tick(app):
                 "data": data
             }
             await ws.send_str(json.dumps(msg))
+            for c_msg in common_msgs:
+                await ws.send_str(json.dumps(c_msg))
+        for ws in ws_to_close:
+            app['GAME'].map.removePlayer(app['WS2PLAYER'][ws])
+            app['WS2PLAYER'].pop(ws)
         await asyncio.sleep(TICK_RATE)
         overall += TICK_RATE
 

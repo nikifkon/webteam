@@ -3,6 +3,7 @@ import { Field, Free, Wall, None, Bullet } from './field.js';
 import { Player } from './player.js';
 import Vector from './vector.js';
 import { MoveCommand, ShootCommand } from './commands.js';
+import { Notification } from './notification.js'
 
 
 const WS_ENDPOINT = 'ws://158.160.48.156/api/game'
@@ -200,6 +201,12 @@ async function entrypoint() {
             ]
 
             draw_game(cxt, GAME);
+        } else if (data.command == "new_player") {
+            (new Notification(`new player: ${data.data.name}`)).render();
+        } else if (data.command == "player_loose") {
+            (new Notification(`player loose: ${data.data.name}`)).render();
+        } else if (data.command == "player_win") {
+            (new Notification(`player win: ${data.data.name}`)).render();
         }
     })
 }
