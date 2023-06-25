@@ -1,13 +1,18 @@
 http://158.160.48.156/frontend/start_menu.html
 
+## Deploy
+
+```bash
+./deploy.sh
 python3 -m gunicorn server.app:get_app --bind localhost:8081 --worker-class aiohttp.GunicornWebWorker
+```
 
 ## Usage
 
 start local server: `localhost:8081`
 
 ```
-pip install -r requirements.txt
+pip install -r server/requirements.txt
 python -m server.app
 ```
 

@@ -75,6 +75,14 @@ class Player:
                 return True
         return False
 
+    def check_in_fire(self, pl_pos: Vector, map: list[list[str]]):
+        for pos in self.get_kontur(pl_pos):
+            y = max(0, min(len(map) - 1, int(pos.values[1])))
+            x = max(0, min(len(map[0]) - 1, int(pos.values[0])))
+            if map[y][x] == 'D':
+                return True
+        return False
+
 class DamageArea:
     def __init__(self, owner: Player, ttl: float, created_at: float):
         self.owner = owner
@@ -122,6 +130,7 @@ class Map:
         self.visible_width = 50
         self.visible_height = 50
         self.player2pos: dict[Player, Vector] = {}  # always discrete
+        self.player2posPrev: dict[Player, Vector] = {}  # always discrete
         self.damageAreas2pos: dict[tuple[DamageArea, Vector]] = {}
 
         with open(filename) as f:
@@ -131,14 +140,22 @@ class Map:
     
     def spawnPlayer(self, player: Player):
         x, y = random.randint(0, self.width - 1), random.randint(0, self.height - 1)
-        self.player2pos[player] = Vector(x, y)
+        pos = Vector(x, y)
+        while player.check_wall_in(pos, self._map):
+            x, y = random.randint(0, self.width - 1), random.randint(0, self.height - 1)
+            pos = Vector(x, y)
+
+        self.player2pos[player] = pos
+        self.player2posPrev[player] = pos
 
     def removePlayer(self, player: Player):
         self.player2pos.pop(player)
+        self.player2posPrev.pop(player)
 
 
     def move(self, player: Player, vec: Vector, dt: float, apply_charge: bool):
         print(self.player2pos[player])
+        self.player2posPrev = self.player2pos.copy()
         direction = vec.normalize()
         l = dt * player.move_speed
         if apply_charge:
@@ -155,25 +172,27 @@ class Map:
                 if tries > 0:
                     break
 
-
     def shoot(self, area: DamageArea):
         self.damageAreas2pos[area] = self.player2pos[area.owner]
 
     def moveDamageAreas(self, dt: float, time: float):
+        event_happen = False
         for area in list(self.damageAreas2pos.keys()):
             vec = dt * area.owner.shoot_speed * area.direction.normalize()
             self.damageAreas2pos[area] += vec
             pos = self.damageAreas2pos[area]
             if pl := self.find_col_player(area):
+                event_happen = True
                 pl.hp = max(0, pl.hp - area.owner.shoot_damage)
                 self.damageAreas2pos.pop(area)
             if self._map[int(pos.values[1])][int(pos.values[0])] == 'W':
                 self.damageAreas2pos.pop(area)
             if area.created_at + area.ttl < time:
                 self.damageAreas2pos.pop(area)
+        return event_happen
 
     def find_col_player(self, area: DamageArea):
-        for player, pos in self.player2pos.items():
+        for player, pos in self.player2posPrev.items():
             if player != area.owner and player.is_col(pos, self.damageAreas2pos[area]):
                 return player
 
@@ -200,6 +219,11 @@ class Game:
         self.damageAreaQueue = []
         self.player2lastshoot: dict[Player, float] = {}
         self.player2lastcharge: dict[Player, float] = {}
+        self.player2lastdamage_by_fire: dict[Player, float] = {}
+        self.fire_damage_cd = 2
+        self.last_event_time = 0
+        self.idle_to_resize_time = 2
+        self.resize_padding = 0
         self.map = Map("server/idoknow100x100.txt")
     
     def joinPlayer(self, player: Player) -> dict:
@@ -225,12 +249,14 @@ class Game:
 
         self.player2lastshoot[player] = -player.shoot_cd
         self.player2lastcharge[player] = -player.charge_cd
+        self.player2lastdamage_by_fire[player] = 0
         return data
 
     def removePlayer(self, player: Player):
         self.player2lastshoot.pop(player)
         self.player2lastcharge.pop(player)
         self.player2pos.pop(player, None)
+        self.player2lastdamage_by_fire.pop(player)
         self.map.removePlayer(player)
     
     def registerMove(self, player: Player, data: dict):
@@ -276,8 +302,16 @@ class Game:
     def can_charge(self, player: Player, time: float):
         return time - self.player2lastcharge[player] > player.charge_cd
     
-    
+    def need_resize(self, time: float):
+        return time - self.last_event_time > self.idle_to_resize_time
+
+    def can_be_damaged_by_fire(self, player, time: float):
+        return time - self.player2lastdamage_by_fire[player] > self.fire_damage_cd
+
     def updateGame(self, dt, time):
+        event_happen = self.map.moveDamageAreas(dt, time)
+        if event_happen:
+            self.last_event_time = time
         for player, queues in self.playersQueues.items():
             move_q = queues['move']
             shoot_q = queues['shoot']
@@ -297,9 +331,33 @@ class Game:
             move_q.clear()
             shoot_q.clear()
             charge_q.clear()
-        self.map.moveDamageAreas(dt, time)
-        
 
+            if self.can_be_damaged_by_fire(player, time) and player.check_in_fire(self.map.player2pos[player], self.map._map):
+                player.hp = max(0, player.hp - 1)
+                self.player2lastdamage_by_fire[player] = time
+
+    def resize(self, time) -> str:
+        self.last_event_time = time
+        for x in range(self.map.width):
+            for y in [self.resize_padding, self.map.height - 1 - self.resize_padding]:
+                print(y,x)
+                if self.map._map[y][x] == 'F':
+                    self.map._map[y][x] = 'D'
+        for y in range(self.map.height):
+            for x in [self.resize_padding, self.map.width - 1 - self.resize_padding]:
+                if self.map._map[y][x] == 'F':
+                    self.map._map[y][x] = 'D'
+        self.resize_padding += 1
+        return str(self.map)
+
+    def reset(self, time) -> str:
+        self.last_event_time = time
+        self.resize_padding = 0
+        for x in range(self.map.width):
+            for y in range(self.map.height):
+                if self.map._map[y][x] == 'D':
+                    self.map._map[y][x] = 'F'
+        return str(self.map)
 
 async def tick(app):
     overall = 0
@@ -344,10 +402,19 @@ async def tick(app):
             }
         } for player in new_players)
 
+
+        new_map = None
+        if app['GAME'].need_resize(overall):
+            new_map = app['GAME'].resize(overall)
+        if has_winner:
+            new_map = app['GAME'].reset(overall)
+
         for ws, player in app['WS2PLAYER'].items():
             if player in players_that_loose:
                 ws_to_close.append(ws)
-            data = app['GAME'].getUpdateForPlayer(player)           
+            data = app['GAME'].getUpdateForPlayer(player)
+            if new_map:
+                data["new_map"] = new_map
             msg = {
                 "command": "update",
                 "status": "ok",
@@ -359,6 +426,7 @@ async def tick(app):
         for ws in ws_to_close:
             app['GAME'].map.removePlayer(app['WS2PLAYER'][ws])
             app['WS2PLAYER'].pop(ws)
+
         await asyncio.sleep(TICK_RATE)
         overall += TICK_RATE
 
@@ -393,6 +461,7 @@ async def handle_message(msg, websocket, app):
                         "detail": "unauthorized."
                     }
                 }))
+                return
             app['GAME'].registerMove(player, data["data"])
         elif command == "shoot":
             player = app['WS2PLAYER'].get(websocket)
@@ -404,6 +473,7 @@ async def handle_message(msg, websocket, app):
                         "detail": "unauthorized."
                     }
                 }))
+                return
             app['GAME'].registerShoot(player, data["data"])
     except Exception as exc:
         raise

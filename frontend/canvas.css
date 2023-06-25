@@ -15,3 +15,20 @@ canvas {
     background-image: url('none_sprite.png');
     background-repeat: repeat;
 }
+
+.notificationContainer {
+    position: absolute;
+    width: 400px;
+    bottom: 0px;
+    padding: 1px;
+}
+
+.notificationWrapper {
+    margin: 5px;
+    padding: 3px;
+    background: white;
+    text-align: center;
+    border-radius: 10px;
+    border: 1px solid;
+    font-size: 16px;
+}

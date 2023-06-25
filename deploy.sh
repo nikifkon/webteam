@@ -32,7 +32,6 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "Upgrade";
-
     }
 
     location /frontend {
@@ -48,7 +47,6 @@ sudo ln -s /etc/nginx/sites-available/your_domain /etc/nginx/sites-enabled/
 sudo usermod -a -G webteam www-data
 
 sudo systemctl restart nginx
-
 
 
 sudo apt install gunicorn

@@ -7,6 +7,7 @@ import { Notification } from './notification.js'
 
 
 const WS_ENDPOINT = 'ws://158.160.48.156/api/game'
+// const WS_ENDPOINT = 'ws://localhost:8081/api/game'
 
 const playerCommand = [];
 const me = new Player();
@@ -84,7 +85,7 @@ function draw_game(draw_context, game) {
 }
 
 
-const CELL_SIZE_IN_PIXELS = 10
+const CELL_SIZE_IN_PIXELS = 20;
 
 
 async function redirect_back() {
@@ -173,6 +174,11 @@ async function entrypoint() {
             GAME.center = new_center;
             me.pos = new_center;
             me.hp = data["data"]["HP"]
+            
+            if (data.data.new_map !== undefined) {
+                const field = new Field(data.data.new_map, CELL_SIZE_IN_PIXELS);
+                GAME.field = field;
+            }
 
             // TODO ????
             const enemies = [];
@@ -191,10 +197,6 @@ async function entrypoint() {
                     areas.push(new Bullet((new Vector(area.posX, area.posY)).mul(CELL_SIZE_IN_PIXELS)));
                 }
             });
-
-            if (data.data.visibleDamage > 0) {
-                console.log(areas);
-            }
 
             GAME.damage_areas = [
                 ...areas

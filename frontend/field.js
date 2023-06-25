@@ -9,7 +9,9 @@ export class Field {
                     cell = new Free();
                 } else if (cell_type === "W") {
                     cell = new Wall();
-                } 
+                } else if (cell_type === "D") {
+                    cell = new Fire();
+                }
                 this.cells[this.cells.length - 1].push(cell);
             }
         }
@@ -30,11 +32,10 @@ export class Field {
     getField(ctx) {
         if (this._field_image_data === null) {
             const canvas = ctx.canvas;
-            console.log(canvas, this);
             const init_width = canvas.width;
             const init_height = canvas.height;
-            canvas.width = this.getPixelWidth() * 10;
-            canvas.height = this.getPixelHeight() * 10;
+            canvas.width = this.getPixelWidth() + 100;
+            canvas.height = this.getPixelHeight() + 100;
             ctx.beginPath();
 
             for (let y = 0; y < this.height; y++) {
@@ -119,5 +120,16 @@ export class Bullet extends Cell {
         ctx.translate(this.pos.x, this.pos.y);
         ctx.drawImage(Bullet.img, 0, 0);
         ctx.restore();
+    }
+}
+
+export class Fire extends Cell {
+    constructor() {
+        super();
+        Fire.img = document.getElementById("fire_sprite");
+    }
+
+    render(ctx) {
+        ctx.drawImage(Fire.img, 0, 0);
     }
 }

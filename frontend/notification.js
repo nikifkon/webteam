@@ -1,17 +1,18 @@
 const notificationContainer = document.createElement('div');
-notificationContainer.style.position = 'absolute';
-notificationContainer.style.width = '100px';
-notificationContainer.style.backgroundColor = 'white';
-notificationContainer.style.bottom = '0px';
+notificationContainer.className = 'notificationContainer';
+
 document.querySelector('body').appendChild(notificationContainer);
 
 export class Notification {
-    constructor(text) {
+    constructor(text, color) {
         this.text = text;
+        this.color = color || 'azure';
     }
 
     render() {
         const wrapper = document.createElement('div');
+        wrapper.className = 'notificationWrapper';
+        wrapper.style.background = this.color;
         const text = document.createTextNode(this.text);
         wrapper.appendChild(text);
         notificationContainer.appendChild(wrapper);
