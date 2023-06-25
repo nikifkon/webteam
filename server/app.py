@@ -22,7 +22,6 @@ HOST = os.getenv('HOST', '0.0.0.0')
 PORT = int(os.getenv('PORT', 8081))
 
 TICK_RATE = 1/30
-# TICK_RATE = 1
 
 MELEE_ROLE = 0
 RANGE_ROLE = 1
@@ -32,35 +31,48 @@ class Player:
     def __init__(self, name, role):
         self.name = name
         self.role = role
-        self.hitbox_width = 5
-        self.hitbox_height = 5
+        self.hitbox_width = 20
+        self.hitbox_height = 20
         self.move_speed = 100
         self.shoot_speed = 200
         self.hp = 10
         if role == MELEE_ROLE:
+            self.charge_cd = 1
+            self.charge_mul = 50
+            self.shoot_cd = 1.5
             self.shoot_range = 10
             self.shoot_radius = 2
+            self.shoot_damage = 4
         else:
-            self.shoot_range = 80
+            self.charge_cd = 1
+            self.charge_mul = 50
+            self.shoot_cd = 1
+            self.shoot_range = 300
             self.shoot_radius = 0.4
-    
-    def can_shoot(self):
-        return True
+            self.shoot_damage = 3
+
+    def is_col(self, pl_pos: Vector, pos: Vector) -> bool:
+        diff = pl_pos - pos
+        return all(abs(c) < thr for c, thr in zip(diff.values, [self.hitbox_width, self.hitbox_height]))
 
 class DamageArea:
-    def __init__(self, owner: Player):
+    def __init__(self, owner: Player, ttl: float, created_at: float):
         self.owner = owner
+        self.ttl = ttl
+        self.created_at = created_at
 
 
 class MeleeDamageArea(DamageArea):
-    def __init__(self, owner: Player, direction: Vector):
-        super().__init__(owner)
+    def __init__(self, owner: Player, direction: Vector, created_at: float):
+        ttl = owner.shoot_range / owner.shoot_speed
+        super().__init__(owner, ttl, created_at)
         self.direction = direction
 
 
 class RangeDamageArea(DamageArea):
-    def __init__(self, owner: Player, direction: Vector):
-        super().__init__(owner)
+    def __init__(self, owner: Player, direction: Vector, created_at: float):
+        ttl = owner.shoot_range / owner.shoot_speed
+        super().__init__(owner, ttl, created_at)
         self.direction = direction
 
 
@@ -101,18 +113,29 @@ class Map:
         self.player2pos[player] = Vector(x, y)
 
 
-    def move(self, player: Player, vec: Vector, dt: float):
+    def move(self, player: Player, vec: Vector, dt: float, apply_charge: bool):
         vec = dt * player.move_speed * vec.normalize()
-        print(vec)
+        if apply_charge:
+            vec *= player.charge_mul
         self.player2pos[player] += vec
 
     def shoot(self, area: DamageArea):
         self.damageAreas2pos[area] = self.player2pos[area.owner]
 
-    def moveDamageAreas(self, dt: float):
-        for area in self.damageAreas2pos:
+    def moveDamageAreas(self, dt: float, time: float):
+        for area in list(self.damageAreas2pos.keys()):
             vec = dt * area.owner.shoot_speed * area.direction.normalize()
             self.damageAreas2pos[area] += vec
+            if pl := self.find_col_player(area):
+                pl.hp = max(0, pl.hp - area.owner.shoot_damage)
+                self.damageAreas2pos.pop(area)
+            if area.created_at + area.ttl < time:
+                self.damageAreas2pos.pop(area)
+
+    def find_col_player(self, area: DamageArea):
+        for player, pos in self.player2pos.items():
+            if player != area.owner and player.is_col(pos, self.damageAreas2pos[area]):
+                return player
 
     def _is_visible(self, player, pos):
         player_pos = self.player2pos[player]
@@ -135,12 +158,15 @@ class Game:
     def __init__(self):
         self.playersQueues = {}
         self.damageAreaQueue = []
+        self.player2lastshoot: dict[Player, float] = {}
+        self.player2lastcharge: dict[Player, float] = {}
         self.map = Map("server/free100x30.txt")
     
     def joinPlayer(self, player: Player) -> dict:
         self.playersQueues[player] = {
             "move": [],
-            "shoot": []
+            "shoot": [],
+            "charge": []
         }
         self.map.spawnPlayer(player)
         data = {}
@@ -156,19 +182,25 @@ class Game:
         data["hitboxHeight"] = player.hitbox_height
         data["map"] = str(self.map)
         data["HP"] = player.hp
+
+        self.player2lastshoot[player] = -player.shoot_cd
+        self.player2lastcharge[player] = -player.charge_cd
         return data
         
     
     def registerMove(self, player: Player, data: dict):
-        self.playersQueues[player]["move"].append(Vector(*data.values()))
+        self.playersQueues[player]["move"].append((Vector(data["vecX"], data["vecY"]), data['charge']))
 
     def registerShoot(self, player: Player, data: dict):
         self.playersQueues[player]["shoot"].append(Vector(*data.values()))
 
+    def registerCharge(self, player: Player, data: dict):
+        self.playersQueues[player]["charge"].append(Vector(*data.values()))
+
     def getUpdateForPlayer(self, player: Player) -> dict:
         vec = self.map.player2pos[player]
         visiblebEnemies = [{
-                "role": enemie.role,
+                "role": "melee" if enemie.role == MELEE_ROLE else "range",
                 "posX": pos.values[0],
                 "posY": pos.values[1],
                 "HP": enemie.hp
@@ -190,32 +222,46 @@ class Game:
             "HP": player.hp,
             "visibleEnemeis": visiblebEnemies,
             "visibleDamage": visibleDamage,
-            "shootCD": 0,  # TODO
+            "shootCD": self.player2lastshoot[player],  # TODO
         }
     
-    def updateGame(self, dt):
+    def can_shoot(self, player: Player, time: float):
+        return time - self.player2lastshoot[player] > player.shoot_cd
+    
+    def can_charge(self, player: Player, time: float):
+        return time - self.player2lastshoot[player] > player.charge_cd
+    
+    
+    def updateGame(self, dt, time):
         for player, queues in self.playersQueues.items():
             move_q = queues['move']
             shoot_q = queues['shoot']
+            charge_q = queues['charge']
+
+
             if move_q:
-                self.map.move(player, move_q[0], dt)
-            if shoot_q and player.can_shoot():
+                apply_charge = any(move[1] for move in move_q) and self.can_charge(player, time)
+                self.map.move(player, move_q[0][0], dt, apply_charge)
+            if shoot_q and self.can_shoot(player, time):
                 if player.role == MELEE_ROLE:
-                    area = MeleeDamageArea(player, shoot_q[0])
+                    area = MeleeDamageArea(player, shoot_q[0], time)
                 else:
-                    area = RangeDamageArea(player, shoot_q[0])
+                    area = RangeDamageArea(player, shoot_q[0], time)
                 self.map.shoot(area)
+                self.player2lastshoot[player] = time
             move_q.clear()
             shoot_q.clear()
-        self.map.moveDamageAreas(dt)
+            charge_q.clear()
+        self.map.moveDamageAreas(dt, time)
 
 WS2PLAYER = dict()
 GAME = Game()
 REG_SERVICE = RegService()
 
 async def tick():
+    overall = 0
     while True:
-        GAME.updateGame(TICK_RATE)
+        GAME.updateGame(TICK_RATE, overall)
         for ws, player in WS2PLAYER.items():
             data = GAME.getUpdateForPlayer(player)           
             msg = {
@@ -225,50 +271,56 @@ async def tick():
             }
             await ws.send_str(json.dumps(msg))
         await asyncio.sleep(TICK_RATE)
+        overall += TICK_RATE
 
 
 async def handle_message(msg, websocket):
-    data = json.loads(msg)
-    print(data)
-    command = data.get("command")
-    if command == "join":
-        player = REG_SERVICE.loginPlayer(**data["data"])
-        if not player:
+    try:
+        data = json.loads(msg)
+        print(data)
+        command = data.get("command")
+        if command == "join":
+            player = REG_SERVICE.loginPlayer(**data["data"])
+            if not player:
+                await websocket.send_str(json.dumps({
+                    "command": "join",
+                    "status": "fail",
+                    "data": {"detail": "wrong id/token pair"}
+                }))
+                return
+            WS2PLAYER[websocket] = player
+            data = GAME.joinPlayer(player)
             await websocket.send_str(json.dumps({
                 "command": "join",
-                "status": "fail",
-                "data": {"detail": "wrong id/token pair"}
+                "status": "ok",
+                "data": data
             }))
-            return
-        WS2PLAYER[websocket] = player
-        data = GAME.joinPlayer(player)
-        await websocket.send_str(json.dumps({
-            "command": "join",
-            "status": "ok",
-            "data": data
-        }))
-    elif command == "move":
-        player = WS2PLAYER.get(websocket)
-        if not player:
-            await websocket.send_str(json.dumps({
-                "command": "move",
-                "status": "fail",
-                "data": {
-                    "detail": "unauthorized."
-                }
-            }))
-        GAME.registerMove(player, data["data"])
-    elif command == "shoot":
-        player = WS2PLAYER.get(websocket)
-        if not player:
-            await websocket.send_str(json.dumps({
-                "command": "shoot",
-                "status": "fail",
-                "data": {
-                    "detail": "unauthorized."
-                }
-            }))
-        GAME.registerShoot(player, data["data"])
+        elif command == "move":
+            player = WS2PLAYER.get(websocket)
+            if not player:
+                await websocket.send_str(json.dumps({
+                    "command": "move",
+                    "status": "fail",
+                    "data": {
+                        "detail": "unauthorized."
+                    }
+                }))
+            GAME.registerMove(player, data["data"])
+        elif command == "shoot":
+            player = WS2PLAYER.get(websocket)
+            if not player:
+                await websocket.send_str(json.dumps({
+                    "command": "shoot",
+                    "status": "fail",
+                    "data": {
+                        "detail": "unauthorized."
+                    }
+                }))
+            GAME.registerShoot(player, data["data"])
+    except Exception as exc:
+        print(exc)
+    finally:
+        pass
 
 
 async def testhandle(request):

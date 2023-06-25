@@ -1,7 +1,8 @@
 export class MoveCommand {
-    constructor(vector, player) {
+    constructor(vector, player, charge) {
         this.vector = vector;
         this.player = player;
+        this.charge = charge;
     }
 
     execute() {
@@ -13,7 +14,8 @@ export class MoveCommand {
             "command": "move",
             "data": {
                 "vecX": this.vector.x,
-                "vecY": this.vector.y
+                "vecY": this.vector.y,
+                "charge": this.charge,
             }
         }
     }

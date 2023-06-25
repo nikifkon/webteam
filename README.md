@@ -69,13 +69,16 @@ if id/token was correct
         "visibleMapHeight": 1001,  // always odd
 
         // depends on choosen role
+        "chargeCD": 5,
+        "shootCD": 5,
         "shootRange": 5, // how far you damage can go (in cells)
         "shootRadius" 1, // how wide your damage can go (in radian)
-        "moveSpeed": 5, // cell per sec
         "shootSpeed": 10, // cell per sec
+        "moveSpeed": 5, // cell per sec
         "hitboxWidth": 5,  // always odd
         "hittboxHeight: 5,  // always odd
         "HP": 10,
+        "shootDamage": 3,
     }
 }
 ```
@@ -102,6 +105,7 @@ Every tick you got messages like this:
     "posY": 42,
     "HP": 10,
     "shootCD": "HOW MUCH TIME I HAVE TO WAIT BEFORE NEXT SHOOT",
+    "chargeCD": "HOW MUCH TIME I HAVE TO WAIT BEFORE NEXT CHARGE",
     "visibleEnemeis": [
         {
             "role": "melee"|"range",
@@ -144,8 +148,9 @@ Request
     "command": "move",
     "data": {
         "vecX": 11,
-        "vecY": 22
-    }
+        "vecY": 22,
+        "charge": true // if wanna apply charge
+    },
 }
 ```
 

@@ -47,14 +47,19 @@ function keyUpHandler(e) {
 
 let SHOOT_VEC = null;
 
-document.addEventListener("mouseup", leftClickHandler, false);
+document.addEventListener("click", leftClickHandler, false);
 function leftClickHandler(e) {
-    console.log(e);
     const cursor = new Vector(e.clientX, e.clientY);
     const tl = GAME.getLeftCorner();
     SHOOT_VEC = me.pos.neg().add(tl.neg()).add(cursor);
 }
 
+let CHARGE = false
+
+document.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    CHARGE = true;
+})
 
 
 let needResize = true;
@@ -122,17 +127,17 @@ async function entrypoint() {
         }
 
         if (Math.abs(direction.y) >= 1e-5 || Math.abs(direction.x) >= 1e-5) {
-            const command = new MoveCommand(direction, me);
+            const command = new MoveCommand(direction, me, CHARGE);
             socket.send(JSON.stringify(command.to_msg()));
         }
         playerCommand.length = 0;
+        CHARGE = false;
 
         if (SHOOT_VEC !== null) {
             const command = new ShootCommand(SHOOT_VEC, me);
             socket.send(JSON.stringify(command.to_msg()));
             SHOOT_VEC = null;
         }
-
     }
 
 
