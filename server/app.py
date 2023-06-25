@@ -254,16 +254,14 @@ class Game:
             charge_q.clear()
         self.map.moveDamageAreas(dt, time)
 
-WS2PLAYER = dict()
-GAME = Game()
-REG_SERVICE = RegService()
 
-async def tick():
+
+async def tick(app):
     overall = 0
     while True:
-        GAME.updateGame(TICK_RATE, overall)
-        for ws, player in WS2PLAYER.items():
-            data = GAME.getUpdateForPlayer(player)           
+        app['GAME'].updateGame(TICK_RATE, overall)
+        for ws, player in app['WS2PLAYER'].items():
+            data = app['GAME'].getUpdateForPlayer(player)           
             msg = {
                 "command": "update",
                 "status": "ok",
@@ -274,13 +272,13 @@ async def tick():
         overall += TICK_RATE
 
 
-async def handle_message(msg, websocket):
+async def handle_message(msg, websocket, app):
     try:
         data = json.loads(msg)
         print(data)
         command = data.get("command")
         if command == "join":
-            player = REG_SERVICE.loginPlayer(**data["data"])
+            player = app['REG_SERVICE'].loginPlayer(**data["data"])
             if not player:
                 await websocket.send_str(json.dumps({
                     "command": "join",
@@ -288,15 +286,15 @@ async def handle_message(msg, websocket):
                     "data": {"detail": "wrong id/token pair"}
                 }))
                 return
-            WS2PLAYER[websocket] = player
-            data = GAME.joinPlayer(player)
+            app['WS2PLAYER'][websocket] = player
+            data = app['GAME'].joinPlayer(player)
             await websocket.send_str(json.dumps({
                 "command": "join",
                 "status": "ok",
                 "data": data
             }))
         elif command == "move":
-            player = WS2PLAYER.get(websocket)
+            player = app['WS2PLAYER'].get(websocket)
             if not player:
                 await websocket.send_str(json.dumps({
                     "command": "move",
@@ -305,9 +303,9 @@ async def handle_message(msg, websocket):
                         "detail": "unauthorized."
                     }
                 }))
-            GAME.registerMove(player, data["data"])
+            app['GAME'].registerMove(player, data["data"])
         elif command == "shoot":
-            player = WS2PLAYER.get(websocket)
+            player = app['WS2PLAYER'].get(websocket)
             if not player:
                 await websocket.send_str(json.dumps({
                     "command": "shoot",
@@ -316,7 +314,7 @@ async def handle_message(msg, websocket):
                         "detail": "unauthorized."
                     }
                 }))
-            GAME.registerShoot(player, data["data"])
+            app['GAME'].registerShoot(player, data["data"])
     except Exception as exc:
         print(exc)
     finally:
@@ -328,7 +326,7 @@ async def testhandle(request):
         data = await request.json()
     elif request.content_type == 'application/x-www-form-urlencoded':
         data = await request.post()
-    ret = REG_SERVICE.regPlayer(Player(data["name"], RANGE_ROLE if data["role"] == "range" else MELEE_ROLE))
+    ret = request.app['REG_SERVICE'].regPlayer(Player(data["name"], RANGE_ROLE if data["role"] == "range" else MELEE_ROLE))
     return web.json_response(ret)
 
 
@@ -340,18 +338,26 @@ async def websocket_handler(request):
 
     async for msg in ws:
         if msg.type == aiohttp.WSMsgType.TEXT:
-            await handle_message(msg.data, ws)
+            await handle_message(msg.data, ws, request.app)
     
     # unsubscribe
-    WS2PLAYER.pop(ws)
+    request.app['WS2PLAYER'].pop(ws)
     print('Websocket connection closed')
     return ws
 
 
-async def main(loop):
+async def background_tasks(app):
+    app['WS2PLAYER'] = dict()
+    app['GAME'] = Game()
+    app['REG_SERVICE'] = RegService()
+    app['ws_mail'] = asyncio.create_task(tick(app))
+    
+def get_app():
     app = aiohttp.web.Application()
     app.router.add_route('POST', '/api/register', testhandle)
     app.router.add_route('GET', '/api/game', websocket_handler)
+    app.on_startup.append(background_tasks)
+
     cors = aiohttp_cors.setup(app, defaults={
         "*": aiohttp_cors.ResourceOptions(
                 allow_credentials=True,
@@ -361,16 +367,20 @@ async def main(loop):
     })
     for route in list(app.router.routes()):
         cors.add(route)
+    return app
+
+async def run(loop):
+    app = get_app()
 
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, HOST, PORT)
     await site.start()
-
-    await tick()
+    while True:
+        await asyncio.sleep(5)
 
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(main(loop))
+    loop.run_until_complete(run(loop))
     loop.close()
