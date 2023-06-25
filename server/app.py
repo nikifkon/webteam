@@ -9,7 +9,7 @@ import aiohttp_cors
 import aiohttp
 from aiohttp import web
 import os
-from vector import Vector
+from .vector import Vector
 
 
 FREE = 'F'
@@ -160,7 +160,7 @@ class Game:
         self.damageAreaQueue = []
         self.player2lastshoot: dict[Player, float] = {}
         self.player2lastcharge: dict[Player, float] = {}
-        self.map = Map("free100x30.txt")
+        self.map = Map("server/free100x30.txt")
     
     def joinPlayer(self, player: Player) -> dict:
         self.playersQueues[player] = {
