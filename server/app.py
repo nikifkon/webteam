@@ -352,7 +352,7 @@ async def background_tasks(app):
     app['REG_SERVICE'] = RegService()
     app['ws_mail'] = asyncio.create_task(tick(app))
     
-def get_app():
+async def get_app():
     app = aiohttp.web.Application()
     app.router.add_route('POST', '/api/register', testhandle)
     app.router.add_route('GET', '/api/game', websocket_handler)
