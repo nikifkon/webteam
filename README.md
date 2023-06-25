@@ -1,3 +1,5 @@
+http://158.160.48.156/frontend/start_menu.html
+
 ## Usage
 
 start local server: `localhost:8081`
