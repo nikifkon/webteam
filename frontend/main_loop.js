@@ -5,7 +5,7 @@ import Vector from './vector.js';
 import { MoveCommand, ShootCommand } from './commands.js';
 
 
-const WS_ENDPOINT = 'ws://localhost:8081/api/game'
+const WS_ENDPOINT = 'ws://158.160.48.156/api/game'
 
 const playerCommand = [];
 const me = new Player();

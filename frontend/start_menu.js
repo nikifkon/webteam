@@ -12,7 +12,7 @@ document.getElementById("reg_form").addEventListener("submit", async (evt) => {
         },
         body: JSON.stringify(data)
     }
-    const response = await fetch('http://localhost:8081/api/register', options);
+    const response = await fetch('http://158.160.48.156/api/register', options);
     const creds = await response.json();
     localStorage.setItem('creds', JSON.stringify(creds));
     window.location.href = 'canvas.html'
