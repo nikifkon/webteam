@@ -20,28 +20,28 @@ let GO_DOWN = false;
 
 document.addEventListener("keydown", keyDownHandler, false);
 function keyDownHandler(e) {
-    if (e.key === "Right" || e.key === "ArrowRight" || e.key === "d") {
+    if (e.key === "Right" || e.key === "ArrowRight" || e.key.toLowerCase() === "d" || e.key.toLowerCase() === "в") {
         GO_RIGHT = true;
-    } else if (e.key === "Left" || e.key === "ArrowLeft" || e.key === "a") {
+    } else if (e.key === "Left" || e.key === "ArrowLeft" || e.key.toLowerCase() === "a" || e.key.toLowerCase() === "ф") {
         GO_LEFT = true;
     }
-    if (e.key === "Up" || e.key === "ArrowUp" || e.key === "w") {
+    if (e.key === "Up" || e.key === "ArrowUp" || e.key.toLowerCase() === "w" || e.key.toLowerCase() === "ц") {
         GO_UP = true;
-    } else if (e.key === "Down" || e.key === "ArrowDown" || e.key === "s") {
+    } else if (e.key === "Down" || e.key === "ArrowDown" || e.key.toLowerCase() === "s" || e.key.toLowerCase() === "ы") {
         GO_DOWN = true;
     }
 }
 
 document.addEventListener("keyup", keyUpHandler, false);
 function keyUpHandler(e) {
-    if (e.key === "Right" || e.key === "ArrowRight" || e.key === "d") {
+    if (e.key === "Right" || e.key === "ArrowRight" || e.key.toLowerCase() === "d" || e.key.toLowerCase() === "в") {
         GO_RIGHT = false;
-    } else if (e.key === "Left" || e.key === "ArrowLeft" || e.key === "a") {
+    } else if (e.key === "Left" || e.key === "ArrowLeft" || e.key.toLowerCase() === "a" || e.key.toLowerCase() === "ф") {
         GO_LEFT = false;
     }
-    if (e.key === "Up" || e.key === "ArrowUp" || e.key === "w") {
+    if (e.key === "Up" || e.key === "ArrowUp" || e.key.toLowerCase() === "w" || e.key.toLowerCase() === "ц") {
         GO_UP = false;
-    } else if (e.key === "Down" || e.key === "ArrowDown" || e.key === "s") {
+    } else if (e.key === "Down" || e.key === "ArrowDown" || e.key.toLowerCase() === "s" || e.key.toLowerCase() === "ы") {
         GO_DOWN = false;
     }
 }
