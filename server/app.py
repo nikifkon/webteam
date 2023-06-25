@@ -255,8 +255,8 @@ class Game:
     def removePlayer(self, player: Player):
         self.player2lastshoot.pop(player)
         self.player2lastcharge.pop(player)
-        self.player2pos.pop(player, None)
         self.player2lastdamage_by_fire.pop(player)
+        self.playersQueues.pop(player)
         self.map.removePlayer(player)
     
     def registerMove(self, player: Player, data: dict):
@@ -313,6 +313,7 @@ class Game:
         if event_happen:
             self.last_event_time = time
         for player, queues in self.playersQueues.items():
+            print(player)
             move_q = queues['move']
             shoot_q = queues['shoot']
             charge_q = queues['charge']
@@ -362,7 +363,9 @@ class Game:
 async def tick(app):
     overall = 0
     while True:
+        print('updating...')
         app['GAME'].updateGame(TICK_RATE, overall)
+        print('updated')
         new_players = []
         players_that_loose = []
         player_that_might_win = []
@@ -424,8 +427,9 @@ async def tick(app):
             for c_msg in common_msgs:
                 await ws.send_str(json.dumps(c_msg))
         for ws in ws_to_close:
-            app['GAME'].map.removePlayer(app['WS2PLAYER'][ws])
-            app['WS2PLAYER'].pop(ws)
+            print(app['WS2PLAYER'][ws].name)
+            app['GAME'].removePlayer(app['WS2PLAYER'][ws])
+            app['WS2PLAYER'].pop(ws, None)
 
         await asyncio.sleep(TICK_RATE)
         overall += TICK_RATE
@@ -501,7 +505,7 @@ async def websocket_handler(request):
             await handle_message(msg.data, ws, request.app)
     
     # unsubscribe
-    request.app['WS2PLAYER'].pop(ws)
+    request.app['WS2PLAYER'].pop(ws, None)
     print('Websocket connection closed')
     return ws
 
