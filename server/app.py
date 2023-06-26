@@ -4,12 +4,14 @@ import json
 import random
 import base64
 import os
+import threading
 
 import aiohttp_cors
 import aiohttp
 from aiohttp import web
 import os
 from .vector import Vector
+from .api_bot import start_bot
 
 
 FREE = 'F'
@@ -319,13 +321,13 @@ class Game:
             shoot_q = queues['shoot']
             charge_q = queues['charge']
 
-            print('update move...')
+            # print('update move...')
             if move_q:
                 apply_charge = any(move[1] for move in move_q) and self.can_charge(player, time)
                 if apply_charge: self.player2lastcharge[player] = time
                 self.map.move(player, move_q[0][0], dt, apply_charge)
-            print('update move')
-            print('update shoot...')
+            # print('update move')
+            # print('update shoot...')
             if shoot_q and self.can_shoot(player, time):
                 if player.role == MELEE_ROLE:
                     area = MeleeDamageArea(player, shoot_q[0], time)
@@ -333,16 +335,16 @@ class Game:
                     area = RangeDamageArea(player, shoot_q[0], time)
                 self.map.shoot(area)
                 self.player2lastshoot[player] = time
-            print('update shoot')
+            # print('update shoot')
             move_q.clear()
             shoot_q.clear()
             charge_q.clear()
 
-            print('update fire...')
+            # print('update fire...')
             if self.can_be_damaged_by_fire(player, time) and player.check_in_fire(self.map.player2pos[player], self.map._map):
                 player.hp = max(0, player.hp - 1)
                 self.player2lastdamage_by_fire[player] = time
-            print('update fire')
+            # print('update fire')
 
     def resize(self, time) -> str:
         if self.resize_padding > self.map.height / 2 and self.resize_padding > self.map.width / 2:
@@ -368,6 +370,10 @@ class Game:
                     self.map._map[y][x] = 'F'
         return str(self.map)
 
+
+def threaded_function():
+    start_bot()
+
 async def tick(app):
     overall = 0
     while True:
@@ -378,7 +384,13 @@ async def tick(app):
         ws_to_close = []
         
         for player in app['WS2PLAYER'].values():
-            if player.new:
+            if player.new and player.name != "Bot":  # haha
+                
+
+                thread = threading.Thread(target = threaded_function)
+                thread.start()
+
+
                 new_players.append(player)
                 player.new = False
             elif player.hp <= 0:
@@ -429,11 +441,9 @@ async def tick(app):
                 "status": "ok",
                 "data": data
             }
-            print('sending...')
             await ws.send_str(json.dumps(msg))
             for c_msg in common_msgs:
                 await ws.send_str(json.dumps(c_msg))
-            print('sended')
         for ws in ws_to_close:
             print(app['WS2PLAYER'][ws].name)
             app['GAME'].removePlayer(app['WS2PLAYER'][ws])
