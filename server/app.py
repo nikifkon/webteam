@@ -151,8 +151,8 @@ class Map:
         self.player2posPrev[player] = pos
 
     def removePlayer(self, player: Player):
-        self.player2pos.pop(player)
-        self.player2posPrev.pop(player)
+        self.player2pos.pop(player, None)
+        self.player2posPrev.pop(player, None)
 
 
     def move(self, player: Player, vec: Vector, dt: float, apply_charge: bool):
@@ -260,10 +260,10 @@ class Game:
         return data
 
     def removePlayer(self, player: Player):
-        self.player2lastshoot.pop(player)
-        self.player2lastcharge.pop(player)
-        self.player2lastdamage_by_fire.pop(player)
-        self.playersQueues.pop(player)
+        self.player2lastshoot.pop(player, None)
+        self.player2lastcharge.pop(player, None)
+        self.player2lastdamage_by_fire.pop(player, None)
+        self.playersQueues.pop(player, None)
         self.map.removePlayer(player)
     
     def registerMove(self, player: Player, data: dict):
@@ -381,81 +381,82 @@ def threaded_function():
 async def tick(app):
     overall = 0
     while True:
-        app['GAME'].updateGame(TICK_RATE, overall)
-        new_players = []
-        players_that_loose = []
-        player_that_might_win = []
-        ws_to_close = []
-        
-        for player in app['WS2PLAYER'].values():
-            if player.new and player.name != "Bot":  # haha
-                
+        try:
+            app['GAME'].updateGame(TICK_RATE, overall)
+            new_players = []
+            players_that_loose = []
+            player_that_might_win = []
+            ws_to_close = []
+            
+            for player in app['WS2PLAYER'].values():
+                if player.new and player.name != "Bot":  # haha
+                    
 
-                thread = threading.Thread(target = threaded_function)
-                thread.start()
+                    thread = threading.Thread(target = threaded_function)
+                    thread.start()
 
 
-                new_players.append(player)
-                player.new = False
-            elif player.hp <= 0:
-                players_that_loose.append(player)
-            else:
-                player_that_might_win.append(player)
-        has_winner = len(player_that_might_win) == 1 and len(players_that_loose) > 0
-        winner = player_that_might_win[0] if has_winner else None
+                    new_players.append(player)
+                    player.new = False
+                elif player.hp <= 0:
+                    players_that_loose.append(player)
+                else:
+                    player_that_might_win.append(player)
+            has_winner = len(player_that_might_win) == 1 and len(players_that_loose) > 0
+            winner = player_that_might_win[0] if has_winner else None
 
-        common_msgs = [{
-            "command": "player_loose",
-            "data": {
-                "id": player.id,
-                "name": player.name,
-            }
-        } for player in players_that_loose]
-        if has_winner:
-            common_msgs.append({
-                "command": "player_win",
+            common_msgs = [{
+                "command": "player_loose",
                 "data": {
-                    "id": winner.id,
-                    "name": winner.name,
+                    "id": player.id,
+                    "name": player.name,
                 }
-            })
-        common_msgs.extend({
-            "command": "new_player",
-            "data": {
-                "id": player.id,
-                "name": player.name
-            }
-        } for player in new_players)
+            } for player in players_that_loose]
+            if has_winner:
+                common_msgs.append({
+                    "command": "player_win",
+                    "data": {
+                        "id": winner.id,
+                        "name": winner.name,
+                    }
+                })
+            common_msgs.extend({
+                "command": "new_player",
+                "data": {
+                    "id": player.id,
+                    "name": player.name
+                }
+            } for player in new_players)
 
 
-        new_map = None
-        if app['GAME'].need_resize(overall):
-            new_map = app['GAME'].resize(overall)
-        if has_winner or new_players:
-            new_map = app['GAME'].reset(overall)
+            new_map = None
+            if app['GAME'].need_resize(overall):
+                new_map = app['GAME'].resize(overall)
+            if has_winner or new_players:
+                new_map = app['GAME'].reset(overall)
 
-        for ws, player in app['WS2PLAYER'].items():
-            if player in players_that_loose:
-                ws_to_close.append(ws)
-            data = app['GAME'].getUpdateForPlayer(player, overall)
-            if new_map:
-                data["new_map"] = new_map
-            msg = {
-                "command": "update",
-                "status": "ok",
-                "data": data
-            }
-            await ws.send_str(json.dumps(msg))
-            for c_msg in common_msgs:
-                await ws.send_str(json.dumps(c_msg))
-        for ws in ws_to_close:
-            print(app['WS2PLAYER'][ws].name)
-            app['GAME'].removePlayer(app['WS2PLAYER'][ws])
-            app['WS2PLAYER'].pop(ws, None)
-            asyncio.create_task(ws.close())
-
-        await asyncio.sleep(TICK_RATE)
-        overall += TICK_RATE
+            for ws, player in app['WS2PLAYER'].items():
+                if player in players_that_loose:
+                    ws_to_close.append(ws)
+                data = app['GAME'].getUpdateForPlayer(player, overall)
+                if new_map:
+                    data["new_map"] = new_map
+                msg = {
+                    "command": "update",
+                    "status": "ok",
+                    "data": data
+                }
+                await ws.send_str(json.dumps(msg))
+                for c_msg in common_msgs:
+                    await ws.send_str(json.dumps(c_msg))
+            for ws in ws_to_close:
+                print(app['WS2PLAYER'][ws].name)
+                app['GAME'].removePlayer(app['WS2PLAYER'][ws])
+                app['WS2PLAYER'].pop(ws, None)
+                asyncio.create_task(ws.close())
+        finally:
+            await asyncio.sleep(TICK_RATE)
+            overall += TICK_RATE
 
 
 async def handle_message(msg, websocket, app):
@@ -528,6 +529,7 @@ async def websocket_handler(request):
             await handle_message(msg.data, ws, request.app)
     
     # unsubscribe
+    request.app['GAME'].removePlayer(request.app['WS2PLAYER'][ws])
     request.app['WS2PLAYER'].pop(ws, None)
     print('Websocket connection closed')
     return ws
