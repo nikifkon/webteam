@@ -18,6 +18,6 @@ export class Notification {
         notificationContainer.appendChild(wrapper);
         setTimeout(() => {
             wrapper.remove()
-        }, 10000)
+        }, 5000)
     }
 }

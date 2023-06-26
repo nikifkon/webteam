@@ -520,7 +520,7 @@ async def websocket_handler(request):
             await handle_message(msg.data, ws, request.app)
     
     # unsubscribe
-    request.app['GAME'].removePlayer(request.app['WS2PLAYER'][ws])
+    request.app['GAME'].removePlayer(request.app['WS2PLAYER'].get(ws, None))
     request.app['WS2PLAYER'].pop(ws, None)
     print('Websocket connection closed')
     return ws
