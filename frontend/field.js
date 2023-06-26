@@ -82,8 +82,7 @@ export class Free extends Cell {
 export class Wall extends Cell {
     constructor() {
         super();
-        Wall.img = new Image();
-        Wall.img.src = "wall_sprite.png";
+        Wall.img = document.getElementById("wall_sprite")
     }
 
     static img;

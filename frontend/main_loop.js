@@ -4,6 +4,7 @@ import { Player } from './player.js';
 import Vector from './vector.js';
 import { MoveCommand, ShootCommand } from './commands.js';
 import { Notification } from './notification.js'
+import { CDTimer } from './cd_timer.js';
 
 
 const WS_ENDPOINT = 'ws://158.160.48.156/api/game'
@@ -154,7 +155,10 @@ async function entrypoint() {
 
     socket.addEventListener('open', ev => {
         socket.send(JSON.stringify(init_message))
-    })
+    });
+
+    const shoot_timer = new CDTimer('next shoot (LKM)');
+    const charge_timer = new CDTimer('next charge (PKM)');
 
 
     socket.addEventListener('message', ev => {
@@ -168,6 +172,12 @@ async function entrypoint() {
             cxt['maxHP'] = data["data"]["HP"];
             cxt['hitboxWidth'] = data["data"]["hitboxWidth"] * CELL_SIZE_IN_PIXELS;
             cxt['hitboxHeight'] = data["data"]["hitboxHeight"] * CELL_SIZE_IN_PIXELS;
+            shoot_timer.maxValue = data["data"]["shootCD"];
+            charge_timer.maxValue = data["data"]["chargeCD"];
+
+            shoot_timer.render();
+            charge_timer.render();
+
             console.log(GAME);
         } else if (data["command"] === "update") {
             const new_center = (new Vector(data["data"]["posX"], data["data"]["posY"])).mul(CELL_SIZE_IN_PIXELS);
@@ -179,6 +189,9 @@ async function entrypoint() {
                 const field = new Field(data.data.new_map, CELL_SIZE_IN_PIXELS);
                 GAME.field = field;
             }
+
+            shoot_timer.rerender(data["data"]["shootCD"]);
+            charge_timer.rerender(data["data"]["chargeCD"]);
 
             // TODO ????
             const enemies = [];

@@ -36,7 +36,7 @@ class Player:
         self.hitbox_width = 2
         self.hitbox_height = 3
         self.move_speed = 10
-        self.shoot_speed = 20
+        self.shoot_speed = 40
         self.hp = 10
         if role == MELEE_ROLE:
             self.charge_cd = 3
@@ -154,7 +154,6 @@ class Map:
 
 
     def move(self, player: Player, vec: Vector, dt: float, apply_charge: bool):
-        print(self.player2pos[player])
         self.player2posPrev = self.player2pos.copy()
         direction = vec.normalize()
         l = dt * player.move_speed
@@ -166,7 +165,7 @@ class Map:
             tries = 0
             while tries < 100 and player.check_wall_in(self.player2pos[player], self._map):
                 print('go back')
-                self.player2pos[player] -= 0.01 * l * direction
+                self.player2pos[player] -= 0.2 * l * direction.rotate(2);
                 tries += 1
             else:
                 if tries > 0:
@@ -246,6 +245,8 @@ class Game:
         data["hitboxHeight"] = player.hitbox_height
         data["map"] = str(self.map)
         data["HP"] = player.hp
+        data["shootCD"] = player.shoot_cd
+        data["chargeCD"] = player.charge_cd
 
         self.player2lastshoot[player] = -player.shoot_cd
         self.player2lastcharge[player] = -player.charge_cd
@@ -268,7 +269,7 @@ class Game:
     def registerCharge(self, player: Player, data: dict):
         self.playersQueues[player]["charge"].append(Vector(*data.values()))
 
-    def getUpdateForPlayer(self, player: Player) -> dict:
+    def getUpdateForPlayer(self, player: Player, time) -> dict:
         vec = self.map.player2pos[player]
         visiblebEnemies = [{
                 "role": "melee" if enemie.role == MELEE_ROLE else "range",
@@ -293,7 +294,8 @@ class Game:
             "HP": player.hp,
             "visibleEnemeis": visiblebEnemies,
             "visibleDamage": visibleDamage,
-            "shootCD": self.player2lastshoot[player],  # TODO
+            "shootCD": max(0, self.player2lastshoot[player] + player.shoot_cd - time),  # TODO
+            "chargeCD": max(0, self.player2lastcharge[player] + player.charge_cd - time)
         }
     
     def can_shoot(self, player: Player, time: float):
@@ -313,15 +315,17 @@ class Game:
         if event_happen:
             self.last_event_time = time
         for player, queues in self.playersQueues.items():
-            print(player)
             move_q = queues['move']
             shoot_q = queues['shoot']
             charge_q = queues['charge']
 
+            print('update move...')
             if move_q:
                 apply_charge = any(move[1] for move in move_q) and self.can_charge(player, time)
                 if apply_charge: self.player2lastcharge[player] = time
                 self.map.move(player, move_q[0][0], dt, apply_charge)
+            print('update move')
+            print('update shoot...')
             if shoot_q and self.can_shoot(player, time):
                 if player.role == MELEE_ROLE:
                     area = MeleeDamageArea(player, shoot_q[0], time)
@@ -329,19 +333,23 @@ class Game:
                     area = RangeDamageArea(player, shoot_q[0], time)
                 self.map.shoot(area)
                 self.player2lastshoot[player] = time
+            print('update shoot')
             move_q.clear()
             shoot_q.clear()
             charge_q.clear()
 
+            print('update fire...')
             if self.can_be_damaged_by_fire(player, time) and player.check_in_fire(self.map.player2pos[player], self.map._map):
                 player.hp = max(0, player.hp - 1)
                 self.player2lastdamage_by_fire[player] = time
+            print('update fire')
 
     def resize(self, time) -> str:
+        if self.resize_padding > self.map.height / 2 and self.resize_padding > self.map.width / 2:
+            return
         self.last_event_time = time
         for x in range(self.map.width):
             for y in [self.resize_padding, self.map.height - 1 - self.resize_padding]:
-                print(y,x)
                 if self.map._map[y][x] == 'F':
                     self.map._map[y][x] = 'D'
         for y in range(self.map.height):
@@ -363,9 +371,7 @@ class Game:
 async def tick(app):
     overall = 0
     while True:
-        print('updating...')
         app['GAME'].updateGame(TICK_RATE, overall)
-        print('updated')
         new_players = []
         players_that_loose = []
         player_that_might_win = []
@@ -409,13 +415,13 @@ async def tick(app):
         new_map = None
         if app['GAME'].need_resize(overall):
             new_map = app['GAME'].resize(overall)
-        if has_winner:
+        if has_winner or new_players:
             new_map = app['GAME'].reset(overall)
 
         for ws, player in app['WS2PLAYER'].items():
             if player in players_that_loose:
                 ws_to_close.append(ws)
-            data = app['GAME'].getUpdateForPlayer(player)
+            data = app['GAME'].getUpdateForPlayer(player, overall)
             if new_map:
                 data["new_map"] = new_map
             msg = {
@@ -423,13 +429,16 @@ async def tick(app):
                 "status": "ok",
                 "data": data
             }
+            print('sending...')
             await ws.send_str(json.dumps(msg))
             for c_msg in common_msgs:
                 await ws.send_str(json.dumps(c_msg))
+            print('sended')
         for ws in ws_to_close:
             print(app['WS2PLAYER'][ws].name)
             app['GAME'].removePlayer(app['WS2PLAYER'][ws])
             app['WS2PLAYER'].pop(ws, None)
+            asyncio.create_task(ws.close())
 
         await asyncio.sleep(TICK_RATE)
         overall += TICK_RATE

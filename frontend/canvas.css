@@ -20,15 +20,53 @@ canvas {
     position: absolute;
     width: 400px;
     bottom: 0px;
-    padding: 1px;
+    padding: 5px;
 }
 
 .notificationWrapper {
+    height: 70px;
+    line-height: 70px;
     margin: 5px;
     padding: 3px;
     background: white;
     text-align: center;
     border-radius: 10px;
     border: 1px solid;
-    font-size: 16px;
+    font-size: 26px;
+}
+
+.cdContainer {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    /* padding: 5px; */
+    /* background: white; */
+}
+
+.cdTimerWrapper2 {
+    margin: 5px;
+    height: 70px;
+    position: relative;
+}
+
+.front {
+    background: red;
+    height: inherit;
+    position: absolute;
+}
+
+.back {
+    background: grey;
+    height: inherit;
+    position: absolute;
+}
+
+.front_text {
+    height: inherit;
+    position: absolute;
+    
+    color: #fff;
+    font-size: 26px;
+    text-align: center;
+    line-height: 70px;
 }

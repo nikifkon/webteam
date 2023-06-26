@@ -4,7 +4,7 @@ export class Player {
     constructor(init_pos, hp) {
         this.pos = init_pos || new Vector(10, 10);
         this.hp = hp;
-        Player.img = document.getElementById("melee_sprite")
+        Player.img = document.getElementById("melee_sprite2")
     }
 
     static img;
@@ -22,12 +22,12 @@ export class Player {
         cxt.translate(0, -hpBarHeight - 5);
         cxt.beginPath();
         cxt.rect(0, 0, hpBarWidth, hpBarHeight);
-        cxt.fillStyle = "gray";
+        cxt.fillStyle = "red";
         cxt.fill();
 
         cxt.beginPath();
         cxt.rect(0, 0, hpBarWidth * this.hp / cxt.maxHP, hpBarHeight);
-        cxt.fillStyle = "red";
+        cxt.fillStyle = "green";
         cxt.fill();
 
         cxt.restore();
