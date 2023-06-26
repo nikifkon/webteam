@@ -182,11 +182,15 @@ class Map:
             vec = dt * area.owner.shoot_speed * area.direction.normalize()
             self.damageAreas2pos[area] += vec
             pos = self.damageAreas2pos[area]
+            y, x = int(pos.values[1]), int(pos.values[0])
             if pl := self.find_col_player(area):
                 event_happen = True
                 pl.hp = max(0, pl.hp - area.owner.shoot_damage)
                 self.damageAreas2pos.pop(area)
-            if self._map[int(pos.values[1])][int(pos.values[0])] == 'W':
+            try:
+                if self._map[y][x] == 'W':
+                    self.damageAreas2pos.pop(area)
+            except IndexError:
                 self.damageAreas2pos.pop(area)
             if area.created_at + area.ttl < time:
                 self.damageAreas2pos.pop(area)
