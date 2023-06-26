@@ -187,12 +187,9 @@ class Map:
                 event_happen = True
                 pl.hp = max(0, pl.hp - area.owner.shoot_damage)
                 self.damageAreas2pos.pop(area)
-            try:
-                if self._map[y][x] == 'W':
-                    self.damageAreas2pos.pop(area)
-            except IndexError:
+            elif self._map[y][x] == 'W':
                 self.damageAreas2pos.pop(area)
-            if area.created_at + area.ttl < time:
+            elif area.created_at + area.ttl < time:
                 self.damageAreas2pos.pop(area)
         return event_happen
 
@@ -325,13 +322,10 @@ class Game:
             shoot_q = queues['shoot']
             charge_q = queues['charge']
 
-            print('update move...')
             if move_q:
                 apply_charge = any(move[1] for move in move_q) and self.can_charge(player, time)
                 if apply_charge: self.player2lastcharge[player] = time
                 self.map.move(player, move_q[0][0], dt, apply_charge)
-            print('update move')
-            print('update shoot...')
             if shoot_q and self.can_shoot(player, time):
                 if player.role == MELEE_ROLE:
                     area = MeleeDamageArea(player, shoot_q[0], time)
@@ -339,16 +333,13 @@ class Game:
                     area = RangeDamageArea(player, shoot_q[0], time)
                 self.map.shoot(area)
                 self.player2lastshoot[player] = time
-            print('update shoot')
             move_q.clear()
             shoot_q.clear()
             charge_q.clear()
 
-            print('update fire...')
             if self.can_be_damaged_by_fire(player, time) and player.check_in_fire(self.map.player2pos[player], self.map._map):
                 player.hp = max(0, player.hp - 1)
                 self.player2lastdamage_by_fire[player] = time
-            print('update fire')
 
     def resize(self, time) -> str:
         if self.resize_padding > self.map.height / 2 and self.resize_padding > self.map.width / 2:
